@@ -7,17 +7,48 @@ from datetime import datetime
 import time
 import threading
 from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 import certifi
+import ssl
 
 app = Flask(__name__, static_folder='public', static_url_path='')
 app.secret_key = secrets.token_hex(16)
 
-# MongoDB connection
+# MongoDB connection with improved SSL configuration
 mongo_uri = "mongodb+srv://x3doge:OMGbbpro2010@403cluster0.zkvn1jo.mongodb.net/?retryWrites=true&w=majority&appName=403Cluster0"
-client = MongoClient(mongo_uri, tlsCAFile=certifi.where())
-db = client["casino_db"]
-users_collection = db["users"]
-games_collection = db["games"]
+
+# Configure MongoDB client with proper SSL settings
+try:
+    client = MongoClient(
+        mongo_uri,
+        tlsCAFile=certifi.where(),
+        ssl=True,
+        ssl_cert_reqs=ssl.CERT_REQUIRED,
+        connectTimeoutMS=30000,
+        socketTimeoutMS=30000,
+        serverSelectionTimeoutMS=30000,
+    )
+    # Test connection
+    client.admin.command('ping')
+    print("MongoDB connection successful")
+    db = client["casino_db"]
+    users_collection = db["users"]
+    games_collection = db["games"]
+except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+    print(f"MongoDB connection error: {e}")
+    # Fallback to in-memory data for development/testing
+    print("Falling back to in-memory data storage")
+    db = None
+    users_collection = None
+    games_collection = None
+    
+    # In-memory storage as fallback
+    in_memory_users = [
+        {"username": "admin", "password": "admin123", "balance": 100},
+        {"username": "user1", "password": "password123", "balance": 5000},
+        {"username": "user2", "password": "password123", "balance": 7500}
+    ]
+    in_memory_games = []
 
 # Shared crash game state
 crash_game_state = {
@@ -35,16 +66,68 @@ crash_game_lock = threading.Lock()  # Lock for thread-safe access to crash_game_
 
 # Initialize data if the database is empty
 def initialize_database():
-    if users_collection.count_documents({}) == 0:
-        default_users = [
-            {"username": "admin", "password": "admin123", "balance": 100},
-            {"username": "user1", "password": "password123", "balance": 5000},
-            {"username": "user2", "password": "password123", "balance": 7500}
-        ]
-        users_collection.insert_many(default_users)
+    # Skip if we're using in-memory storage
+    if users_collection is None:
+        return
+        
+    try:
+        if users_collection.count_documents({}) == 0:
+            default_users = [
+                {"username": "admin", "password": "admin123", "balance": 100},
+                {"username": "user1", "password": "password123", "balance": 5000},
+                {"username": "user2", "password": "password123", "balance": 7500}
+            ]
+            users_collection.insert_many(default_users)
+            print("Initialized database with default users")
+    except Exception as e:
+        print(f"Error initializing database: {e}")
 
 # Call initialize database at startup
 initialize_database()
+
+# Helper function to get user data (works with both MongoDB and fallback)
+def get_user(username):
+    if users_collection is not None:
+        return users_collection.find_one({"username": username})
+    else:
+        # Fallback to in-memory
+        for user in in_memory_users:
+            if user["username"] == username:
+                return user
+        return None
+
+# Helper function to update user balance (works with both MongoDB and fallback)
+def update_user_balance(username, amount, is_set=False):
+    if users_collection is not None:
+        if is_set:
+            return users_collection.update_one(
+                {"username": username},
+                {"$set": {"balance": amount}}
+            )
+        else:
+            return users_collection.update_one(
+                {"username": username},
+                {"$inc": {"balance": amount}}
+            )
+    else:
+        # Fallback to in-memory
+        for user in in_memory_users:
+            if user["username"] == username:
+                if is_set:
+                    user["balance"] = amount
+                else:
+                    user["balance"] += amount
+                return True
+        return False
+
+# Helper function to save game data (works with both MongoDB and fallback)
+def save_game(game_data):
+    if games_collection is not None:
+        return games_collection.insert_one(game_data)
+    else:
+        # Fallback to in-memory
+        in_memory_games.append(game_data)
+        return True
 
 # Routes
 @app.route('/')
@@ -59,7 +142,7 @@ def login():
     username = data.get('username')
     password = data.get('password')
     
-    user = users_collection.find_one({"username": username})
+    user = get_user(username)
     
     if user and user["password"] == password:
         session['username'] = username
@@ -73,7 +156,7 @@ def register():
     username = data.get('username')
     password = data.get('password')
     
-    existing_user = users_collection.find_one({"username": username})
+    existing_user = get_user(username)
     if existing_user:
         return jsonify({'success': False, 'message': 'ชื่อผู้ใช้นี้มีอยู่แล้ว'})
     
@@ -85,7 +168,7 @@ def register():
         "created_at": datetime.now()
     }
     
-    users_collection.insert_one(new_user)
+    update_user_balance(username, 100)
     session['username'] = username
     
     return jsonify({'success': True, 'balance': new_user["balance"]})
@@ -109,10 +192,7 @@ def reset_balance():
     
     username = session['username']
     # Reset balance to 100 baht
-    users_collection.update_one(
-        {"username": username},
-        {"$set": {"balance": 100}}
-    )
+    update_user_balance(username, 100, True)
     
     return jsonify({'success': True, 'message': 'รีเซ็ตยอดเงินเป็น 100 บาทเรียบร้อยแล้ว', 'balance': 100})
 
@@ -158,7 +238,7 @@ def get_balance():
         return jsonify({'success': False, 'message': 'ไม่ได้เข้าสู่ระบบ'})
     
     username = session['username']
-    user = users_collection.find_one({"username": username})
+    user = get_user(username)
     
     if not user:
         return jsonify({'success': False, 'message': 'ไม่พบผู้ใช้'})
@@ -207,7 +287,7 @@ def start_blackjack():
     username = session['username']
     
     # Get user from MongoDB
-    user = users_collection.find_one({"username": username})
+    user = get_user(username)
     if not user:
         return jsonify({'success': False, 'message': 'ไม่พบผู้ใช้'})
     
@@ -215,10 +295,7 @@ def start_blackjack():
         return jsonify({'success': False, 'message': 'จำนวนเงินเดิมพันไม่ถูกต้อง'})
     
     # Deduct bet amount
-    users_collection.update_one(
-        {"username": username},
-        {"$inc": {"balance": -bet}}
-    )
+    update_user_balance(username, -bet)
     
     # Create new game
     deck = create_deck()
@@ -238,7 +315,7 @@ def start_blackjack():
         'timestamp': datetime.now()
     }
     
-    games_collection.insert_one(game_data)
+    save_game(game_data)
     
     player_value = calculate_hand_value(player_hand)
     dealer_value = calculate_hand_value([dealer_hand[0]])  # Only show first card
@@ -248,28 +325,16 @@ def start_blackjack():
         dealer_value = calculate_hand_value(dealer_hand)
         if dealer_value == 21:
             # Push - both have blackjack
-            users_collection.update_one(
-                {"username": username},
-                {"$inc": {"balance": bet}}
-            )
-            games_collection.update_one(
-                {"game_id": game_id},
-                {"$set": {"status": "push"}}
-            )
+            update_user_balance(username, bet)
+            game_data['status'] = "push"
         else:
             # Player wins with blackjack (pays 3:2)
             win_amount = bet + (bet * 1.5)
-            users_collection.update_one(
-                {"username": username},
-                {"$inc": {"balance": win_amount}}
-            )
-            games_collection.update_one(
-                {"game_id": game_id},
-                {"$set": {"status": "win"}}
-            )
+            update_user_balance(username, win_amount)
+            game_data['status'] = "win"
     
     # Get updated user balance
-    user = users_collection.find_one({"username": username})
+    user = get_user(username)
     
     return jsonify({
         'success': True,
@@ -291,7 +356,7 @@ def blackjack_hit():
     game_id = data.get('game_id')
     username = session['username']
     
-    game = games_collection.find_one({"game_id": game_id, "username": username})
+    game = get_user(username)
     if not game:
         return jsonify({'success': False, 'message': 'เกมไม่ถูกต้อง'})
     
@@ -310,19 +375,14 @@ def blackjack_hit():
         game_status = 'lose'
     
     # Update game in database
-    games_collection.update_one(
-        {"game_id": game_id},
-        {
-            "$set": {
-                "player_hand": player_hand,
-                "deck": deck,
-                "status": game_status
-            }
-        }
-    )
+    update_user_balance(username, -game['bet'])
+    game['player_hand'] = player_hand
+    game['deck'] = deck
+    game['status'] = game_status
+    update_user_balance(username, game['bet'])
     
     # Get updated user balance
-    user = users_collection.find_one({"username": username})
+    user = get_user(username)
     
     return jsonify({
         'success': True,
@@ -341,7 +401,7 @@ def blackjack_stand():
     game_id = data.get('game_id')
     username = session['username']
     
-    game = games_collection.find_one({"game_id": game_id, "username": username})
+    game = get_user(username)
     if not game:
         return jsonify({'success': False, 'message': 'เกมไม่ถูกต้อง'})
     
@@ -365,40 +425,26 @@ def blackjack_stand():
     if dealer_value > 21:
         game_status = 'win'
         win_amount = bet * 2
-        users_collection.update_one(
-            {"username": username},
-            {"$inc": {"balance": win_amount}}
-        )
+        update_user_balance(username, win_amount)
     elif dealer_value > player_value:
         game_status = 'lose'
     elif dealer_value < player_value:
         game_status = 'win'
         win_amount = bet * 2
-        users_collection.update_one(
-            {"username": username},
-            {"$inc": {"balance": win_amount}}
-        )
+        update_user_balance(username, win_amount)
     else:
         game_status = 'push'
-        users_collection.update_one(
-            {"username": username},
-            {"$inc": {"balance": bet}}
-        )
+        update_user_balance(username, bet)
     
     # Update game in database
-    games_collection.update_one(
-        {"game_id": game_id},
-        {
-            "$set": {
-                "dealer_hand": dealer_hand,
-                "deck": deck,
-                "status": game_status
-            }
-        }
-    )
+    update_user_balance(username, -bet)
+    game['dealer_hand'] = dealer_hand
+    game['deck'] = deck
+    game['status'] = game_status
+    update_user_balance(username, bet)
     
     # Get updated user balance
-    user = users_collection.find_one({"username": username})
+    user = get_user(username)
     
     return jsonify({
         'success': True,
@@ -419,7 +465,7 @@ def slot_spin():
     username = session['username']
     
     # Get user from MongoDB
-    user = users_collection.find_one({"username": username})
+    user = get_user(username)
     if not user:
         return jsonify({'success': False, 'message': 'ไม่พบผู้ใช้'})
     
@@ -427,10 +473,7 @@ def slot_spin():
         return jsonify({'success': False, 'message': 'จำนวนเงินเดิมพันไม่ถูกต้อง'})
     
     # Deduct bet amount
-    users_collection.update_one(
-        {"username": username},
-        {"$inc": {"balance": -bet}}
-    )
+    update_user_balance(username, -bet)
     
     # 5x5 grid symbols
     symbols = ['🍒', '🍊', '🍋', '🍇', '🍉', '🍓', '💎', '7️⃣', '🎰']
@@ -449,8 +492,9 @@ def slot_spin():
     win_amount = calculate_slot_win(matches, bet)
     
     # Create game record
+    game_id = secrets.token_hex(8)
     game_data = {
-        'game_id': secrets.token_hex(8),
+        'game_id': game_id,
         'game_type': 'slot',
         'username': username,
         'bet': bet,
@@ -459,16 +503,13 @@ def slot_spin():
         'win_amount': win_amount,
         'timestamp': datetime.now()
     }
-    games_collection.insert_one(game_data)
+    save_game(game_data)
     
     if win_amount > 0:
-        users_collection.update_one(
-            {"username": username},
-            {"$inc": {"balance": win_amount}}
-        )
+        update_user_balance(username, win_amount)
     
     # Get updated user balance
-    user = users_collection.find_one({"username": username})
+    user = get_user(username)
     
     return jsonify({
         'success': True,
@@ -609,10 +650,7 @@ def check_crash_game_status():
                 win_amount = int(bet * current_multiplier)
                 
                 # Update user balance in MongoDB
-                users_collection.update_one(
-                    {"username": username},
-                    {"$inc": {"balance": win_amount}}
-                )
+                update_user_balance(username, win_amount)
                 
                 # Record game in history
                 game_data = {
@@ -625,7 +663,7 @@ def check_crash_game_status():
                     'auto_cashout': True,
                     'timestamp': datetime.now()
                 }
-                games_collection.insert_one(game_data)
+                save_game(game_data)
                 
                 # Remove from active players
                 del crash_game_state['active_players'][username]
@@ -647,7 +685,7 @@ def check_crash_game_status():
                     'status': 'lost',
                     'timestamp': datetime.now()
                 }
-                games_collection.insert_one(game_data)
+                save_game(game_data)
             
             # Add to history
             crash_game_state['game_history'].insert(0, crash_game_state['crash_point'])
@@ -693,7 +731,7 @@ def start_crash_game():
     username = session['username']
     
     # Get user from MongoDB
-    user = users_collection.find_one({"username": username})
+    user = get_user(username)
     if not user:
         return jsonify({'success': False, 'message': 'ไม่พบผู้ใช้'})
     
@@ -701,10 +739,7 @@ def start_crash_game():
         return jsonify({'success': False, 'message': 'จำนวนเงินเดิมพันไม่ถูกต้อง'})
     
     # Deduct bet amount
-    users_collection.update_one(
-        {"username": username},
-        {"$inc": {"balance": -bet}}
-    )
+    update_user_balance(username, -bet)
     
     with crash_game_lock:
         # Add player to waiting room if game is active or crashed
@@ -724,7 +759,7 @@ def start_crash_game():
             status = 'waiting'
     
     # Get updated user balance
-    user = users_collection.find_one({"username": username})
+    user = get_user(username)
     
     return jsonify({
         'success': True,
@@ -744,7 +779,7 @@ def crash_game_status():
     username = session['username']
     
     # Get user from MongoDB
-    user = users_collection.find_one({"username": username})
+    user = get_user(username)
     if not user:
         return jsonify({'success': False, 'message': 'ไม่พบผู้ใช้'})
     
@@ -800,10 +835,7 @@ def crash_cashout():
         win_amount = int(bet * current_multiplier)
         
         # Add winnings to user balance in MongoDB
-        users_collection.update_one(
-            {"username": username},
-            {"$inc": {"balance": win_amount}}
-        )
+        update_user_balance(username, win_amount)
         
         # Record game in history
         game_data = {
@@ -816,13 +848,13 @@ def crash_cashout():
             'auto_cashout': False,
             'timestamp': datetime.now()
         }
-        games_collection.insert_one(game_data)
+        save_game(game_data)
         
         # Remove from active players
         del crash_game_state['active_players'][username]
     
     # Get updated user balance
-    user = users_collection.find_one({"username": username})
+    user = get_user(username)
     
     return jsonify({
         'success': True,
@@ -844,7 +876,7 @@ def plinko_play():
     username = session['username']
     
     # Get user from MongoDB
-    user = users_collection.find_one({"username": username})
+    user = get_user(username)
     if not user:
         return jsonify({'success': False, 'message': 'ไม่พบผู้ใช้'})
     
@@ -852,10 +884,7 @@ def plinko_play():
         return jsonify({'success': False, 'message': 'จำนวนเงินเดิมพันไม่ถูกต้อง'})
     
     # Deduct bet amount
-    users_collection.update_one(
-        {"username": username},
-        {"$inc": {"balance": -bet}}
-    )
+    update_user_balance(username, -bet)
     
     # Define multipliers based on risk
     multipliers = {
@@ -890,10 +919,7 @@ def plinko_play():
     
     # Update balance if won
     if profit > 0:
-        users_collection.update_one(
-            {"username": username},
-            {"$inc": {"balance": bet + profit}}
-        )
+        update_user_balance(username, bet + profit)
     
     # Create game record
     game_id = secrets.token_hex(8)
@@ -909,10 +935,10 @@ def plinko_play():
         'profit': profit,
         'timestamp': datetime.now()
     }
-    games_collection.insert_one(game_data)
+    save_game(game_data)
     
     # Get updated user balance
-    user = users_collection.find_one({"username": username})
+    user = get_user(username)
     
     return jsonify({
         'success': True,
