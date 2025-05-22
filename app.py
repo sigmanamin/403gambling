@@ -6,10 +6,16 @@ import secrets
 from datetime import datetime
 import time
 import threading
-from pymongo import MongoClient
+from pymongo import MongoClient, ASCENDING
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 import certifi
 import ssl
+
+try:
+    import dns.resolver
+    DNS_AVAILABLE = True
+except ImportError:
+    DNS_AVAILABLE = False
 
 app = Flask(__name__, static_folder='public', static_url_path='')
 app.secret_key = secrets.token_hex(16)
@@ -17,38 +23,78 @@ app.secret_key = secrets.token_hex(16)
 # MongoDB connection with improved SSL configuration
 mongo_uri = "mongodb+srv://x3doge:OMGbbpro2010@403cluster0.zkvn1jo.mongodb.net/?retryWrites=true&w=majority&appName=403Cluster0"
 
-# Configure MongoDB client with proper SSL settings
-try:
-    client = MongoClient(
-        mongo_uri,
-        tlsCAFile=certifi.where(),
-        ssl=True,
-        ssl_cert_reqs=ssl.CERT_REQUIRED,
-        connectTimeoutMS=30000,
-        socketTimeoutMS=30000,
-        serverSelectionTimeoutMS=30000,
-    )
-    # Test connection
-    client.admin.command('ping')
-    print("MongoDB connection successful")
-    db = client["casino_db"]
-    users_collection = db["users"]
-    games_collection = db["games"]
-except (ConnectionFailure, ServerSelectionTimeoutError) as e:
-    print(f"MongoDB connection error: {e}")
-    # Fallback to in-memory data for development/testing
-    print("Falling back to in-memory data storage")
-    db = None
-    users_collection = None
-    games_collection = None
+# Initialize database connections
+db = None
+users_collection = None
+games_collection = None
+in_memory_users = None
+in_memory_games = None
+
+# Simple MongoDB connection function with minimal options
+def connect_to_mongodb():
+    global db, users_collection, games_collection, in_memory_users, in_memory_games
     
-    # In-memory storage as fallback
+    # Connection options to try - minimal parameters to avoid errors
+    try:
+        print("Attempting MongoDB connection with default settings")
+        # Just use the URI with certifi for TLS certificate validation
+        client = MongoClient(mongo_uri, tlsCAFile=certifi.where())
+        
+        # Test connection
+        client.admin.command('ping')
+        print("MongoDB connection successful")
+        
+        db = client["casino_db"]
+        users_collection = db["users"]
+        games_collection = db["games"]
+        return True
+    except Exception as e:
+        print(f"MongoDB connection failed: {e}")
+        # Try a second attempt with tlsAllowInvalidCertificates=True
+        try:
+            print("Attempting MongoDB connection with relaxed TLS settings")
+            client = MongoClient(mongo_uri, tlsAllowInvalidCertificates=True)
+            client.admin.command('ping')
+            print("MongoDB connection successful with relaxed TLS settings")
+            
+            db = client["casino_db"]
+            users_collection = db["users"]
+            games_collection = db["games"]
+            return True
+        except Exception as e:
+            print(f"MongoDB connection with relaxed TLS failed: {e}")
+            
+            # Try a third attempt with no TLS
+            try:
+                print("Attempting MongoDB connection with no TLS")
+                client = MongoClient(mongo_uri, tls=False)
+                client.admin.command('ping')
+                print("MongoDB connection successful with no TLS")
+                
+                db = client["casino_db"]
+                users_collection = db["users"]
+                games_collection = db["games"]
+                return True
+            except Exception as e:
+                print(f"All MongoDB connection attempts failed: {e}")
+                # Fall back to in-memory storage
+                setup_in_memory_storage()
+                return False
+
+def setup_in_memory_storage():
+    global in_memory_users, in_memory_games
+    print("Setting up in-memory data storage")
+    # Initialize with default users
     in_memory_users = [
         {"username": "admin", "password": "admin123", "balance": 100},
         {"username": "user1", "password": "password123", "balance": 5000},
         {"username": "user2", "password": "password123", "balance": 7500}
     ]
     in_memory_games = []
+    print(f"In-memory storage initialized with {len(in_memory_users)} users")
+
+# Try to connect to MongoDB
+connect_to_mongodb()
 
 # Shared crash game state
 crash_game_state = {
@@ -81,6 +127,8 @@ def initialize_database():
             print("Initialized database with default users")
     except Exception as e:
         print(f"Error initializing database: {e}")
+        # If initialization fails, switch to in-memory storage
+        setup_in_memory_storage()
 
 # Call initialize database at startup
 initialize_database()
@@ -88,27 +136,47 @@ initialize_database()
 # Helper function to get user data (works with both MongoDB and fallback)
 def get_user(username):
     if users_collection is not None:
-        return users_collection.find_one({"username": username})
+        try:
+            return users_collection.find_one({"username": username})
+        except Exception as e:
+            print(f"Error getting user from MongoDB: {e}")
+            # If MongoDB query fails, try the in-memory data if available
+            if in_memory_users:
+                for user in in_memory_users:
+                    if user["username"] == username:
+                        return user
     else:
         # Fallback to in-memory
         for user in in_memory_users:
             if user["username"] == username:
                 return user
-        return None
+    return None
 
 # Helper function to update user balance (works with both MongoDB and fallback)
 def update_user_balance(username, amount, is_set=False):
     if users_collection is not None:
-        if is_set:
-            return users_collection.update_one(
-                {"username": username},
-                {"$set": {"balance": amount}}
-            )
-        else:
-            return users_collection.update_one(
-                {"username": username},
-                {"$inc": {"balance": amount}}
-            )
+        try:
+            if is_set:
+                return users_collection.update_one(
+                    {"username": username},
+                    {"$set": {"balance": amount}}
+                )
+            else:
+                return users_collection.update_one(
+                    {"username": username},
+                    {"$inc": {"balance": amount}}
+                )
+        except Exception as e:
+            print(f"Error updating balance in MongoDB: {e}")
+            # If MongoDB update fails, try the in-memory data if available
+            if in_memory_users:
+                for user in in_memory_users:
+                    if user["username"] == username:
+                        if is_set:
+                            user["balance"] = amount
+                        else:
+                            user["balance"] += amount
+                        return True
     else:
         # Fallback to in-memory
         for user in in_memory_users:
@@ -118,16 +186,24 @@ def update_user_balance(username, amount, is_set=False):
                 else:
                     user["balance"] += amount
                 return True
-        return False
+    return False
 
 # Helper function to save game data (works with both MongoDB and fallback)
 def save_game(game_data):
     if games_collection is not None:
-        return games_collection.insert_one(game_data)
+        try:
+            return games_collection.insert_one(game_data)
+        except Exception as e:
+            print(f"Error saving game data to MongoDB: {e}")
+            # If MongoDB insert fails, use in-memory fallback if available
+            if in_memory_games is not None:
+                in_memory_games.append(game_data)
+                return True
     else:
         # Fallback to in-memory
         in_memory_games.append(game_data)
         return True
+    return False
 
 # Routes
 @app.route('/')
