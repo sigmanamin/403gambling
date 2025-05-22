@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>403classroom เดอะแกมเบลอร์ - พลิงโก</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #4a148c;
+            --secondary-color: #7b1fa2;
+            --accent-color: #e91e63;
+            --text-color: #f3e5f5;
+            --bg-dark: #1a1a2e;
+            --bg-darker: #16213e;
+            --card-bg: #0f3460;
+            --success-color: #4caf50;
+            --warning-color: #ff9800;
+            --danger-color: #f44336;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        .navbar {
+            background-color: var(--bg-darker);
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        .navbar-brand {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--accent-color) !important;
+        }
+
+        .nav-link {
+            color: var(--text-color) !important;
+        }
+
+        .nav-link:hover {
+            color: var(--accent-color) !important;
+        }
+
+        .balance-display {
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--accent-color);
+            color: gold;
+            font-weight: bold;
+        }
+
+        .balance-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-reset-balance {
+            background-color: var(--warning-color);
+            color: white;
+            border: none;
+            padding: 0.5rem;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .btn-reset-balance:hover {
+            background-color: #e69500;
+        }
+
+        .game-container {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--secondary-color);
+        }
+
+        .game-title {
+            color: var(--accent-color);
+            text-align: center;
+            margin-bottom: 2rem;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(233, 30, 99, 0.4);
+        }
+
+        .dropball-container {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid var(--secondary-color);
+            margin-bottom: 2rem;
+        }
+
+        .peg-board {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            grid-template-rows: repeat(10, 1fr);
+            gap: 5px;
+            padding: 20px;
+        }
+
+        .peg {
+            width: 12px;
+            height: 12px;
+            background-color: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            position: relative;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .ball {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle at 30% 30%, #f5f5f5, #d1d1d1);
+            border-radius: 50%;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+            display: none;
+        }
+
+        .landing-zones {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 80px;
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+        }
+
+        .zone {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--text-color);
+            border-top: 2px solid var(--secondary-color);
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        .zone::after {
+            content: attr(data-value);
+            position: absolute;
+            bottom: 5px;
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+
+        .zone.selected {
+            background-color: rgba(233, 30, 99, 0.3);
+            border: 2px solid var(--accent-color);
+        }
+
+        .zone.highlight {
+            animation: pulse 1s infinite;
+        }
+
+        .controls-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .bet-controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .bet-amount {
+            width: 150px;
+            text-align: center;
+            padding: 0.5rem;
+            background-color: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--secondary-color);
+            color: var(--text-color);
+            border-radius: 5px;
+        }
+
+        .bet-amount:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .risk-selector {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .risk-btn {
+            padding: 0.5rem 1.5rem;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            border: none;
+        }
+
+        .risk-btn.low {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .risk-btn.medium {
+            background-color: var(--warning-color);
+            color: white;
+        }
+
+        .risk-btn.high {
+            background-color: var(--danger-color);
+            color: white;
+        }
+
+        .risk-btn:hover {
+            transform: scale(1.05);
+            filter: brightness(1.1);
+        }
+
+        .risk-btn.selected {
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5);
+        }
+
+        .position-selector {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .position-info {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .drop-btn {
+            padding: 0.7rem 2rem;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            font-size: 1.2rem;
+            display: block;
+            margin: 1rem auto;
+        }
+
+        .drop-btn:hover:not(:disabled) {
+            background-color: var(--primary-color);
+            transform: scale(1.05);
+        }
+
+        .drop-btn:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+
+        .game-result {
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 1.5rem 0;
+            padding: 1rem;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .win {
+            background-color: rgba(76, 175, 80, 0.2);
+            color: var(--success-color);
+            border: 1px solid var(--success-color);
+        }
+
+        .lose {
+            background-color: rgba(244, 67, 54, 0.2);
+            color: var(--danger-color);
+            border: 1px solid var(--danger-color);
+        }
+
+        .history-table {
+            width: 100%;
+            margin-top: 2rem;
+            border-collapse: collapse;
+        }
+
+        .history-table th, .history-table td {
+            padding: 0.5rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .history-table th {
+            background-color: rgba(0, 0, 0, 0.2);
+            color: var(--accent-color);
+        }
+
+        .multiplier-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .multiplier-card {
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .multiplier-card h4 {
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .multiplier-card.low h4 {
+            color: var(--success-color);
+        }
+
+        .multiplier-card.medium h4 {
+            color: var(--warning-color);
+        }
+
+        .multiplier-card.high h4 {
+            color: var(--danger-color);
+        }
+
+        .multiplier-value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .multiplier-card.low .multiplier-value {
+            color: var(--success-color);
+        }
+
+        .multiplier-card.medium .multiplier-value {
+            color: var(--warning-color);
+        }
+
+        .multiplier-card.high .multiplier-value {
+            color: var(--danger-color);
+        }
+
+        .multiplier-desc {
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .game-rules {
+            margin-top: 2rem;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 1.5rem;
+        }
+
+        .rules-title {
+            color: var(--accent-color);
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+        }
+
+        .rules-list {
+            padding-left: 1.5rem;
+        }
+
+        .rules-list li {
+            margin-bottom: 0.5rem;
+        }
+
+        footer {
+            background-color: var(--bg-darker);
+            border-top: 2px solid var(--primary-color);
+            padding: 2rem 0;
+            margin-top: 3rem;
+        }
+
+        /* Animation for balance */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .balance-highlight {
+            animation: pulse 1s infinite;
+        }
+
+        /* Ball drop animation */
+        @keyframes dropAnimation {
+            from {
+                transform: translateX(-50%) translateY(0);
+            }
+            to {
+                transform: translateX(-50%) translateY(380px);
+            }
+        }
+
+        .ball.dropping {
+            animation: dropAnimation 3s forwards;
+        }
+
+        @media (max-width: 768px) {
+            .multiplier-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .peg-board {
+                grid-template-columns: repeat(10, 1fr);
+                grid-template-rows: repeat(7, 1fr);
+            }
+            
+            .landing-zones {
+                grid-template-columns: repeat(5, 1fr);
+                grid-template-rows: repeat(2, 1fr);
+            }
+        }
+
+        .alert-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .custom-alert {
+            min-width: 300px;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            display: none;
+        }
+
+        .alert-success {
+            background-color: rgba(76, 175, 80, 0.9);
+            color: white;
+            border: 1px solid var(--success-color);
+        }
+
+        .alert-danger {
+            background-color: rgba(244, 67, 54, 0.9);
+            color: white;
+            border: 1px solid var(--danger-color);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/casino">403classroom เดอะแกมเบลอร์</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/casino">หน้าหลัก</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/blackjack">แบล็คแจ็ค</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/slot">สล็อตแมชชีน</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/crash">จรวดพุ่งทะยาน</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/plinko">พลิงโก</a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    <div class="balance-container me-3">
+                        <div class="balance-display">
+                            <i class="fa-solid fa-coins me-2"></i>
+                            <span id="userBalance">0</span> บาท
+                        </div>
+                        <button id="resetBalanceBtn" class="btn-reset-balance">
+                            <i class="fa-solid fa-rotate-left"></i> รีเซ็ต
+                        </button>
+                    </div>
+                    <button id="logoutBtn" class="btn btn-outline-danger">ออกจากระบบ</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="alert-container">
+        <div id="alertBox" class="custom-alert">
+            <span id="alertMessage"></span>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="game-container">
+            <h1 class="game-title">พลิงโก</h1>
+            
+            <div class="game-result" id="gameResult"></div>
+            
+            <div class="dropball-container">
+                <div class="peg-board" id="pegBoard">
+                    <!-- Pegs will be added dynamically -->
+                </div>
+                <div class="ball" id="ball"></div>
+                <div class="landing-zones" id="landingZones">
+                    <!-- Zones will be added dynamically -->
+                </div>
+            </div>
+            
+            <div class="controls-container">
+                <div class="bet-controls">
+                    <span>จำนวนเงินเดิมพัน:</span>
+                    <input type="number" id="betAmount" class="bet-amount" min="10" step="10" value="100">
+                </div>
+                
+                <div class="risk-selector">
+                    <span>ระดับความเสี่ยง:</span>
+                    <button class="risk-btn low selected" data-risk="low">ความเสี่ยงต่ำ</button>
+                    <button class="risk-btn medium" data-risk="medium">ความเสี่ยงกลาง</button>
+                    <button class="risk-btn high" data-risk="high">ความเสี่ยงสูง</button>
+                </div>
+                
+                <div class="position-selector">
+                    <div class="position-info">
+                        เลือกตำแหน่งด้านล่างเพื่อทำนายว่าลูกบอลจะลงที่ไหน
+                    </div>
+                </div>
+                
+                <button id="dropBtn" class="drop-btn">ปล่อยลูกบอล</button>
+            </div>
+            
+            <div class="multiplier-grid">
+                <div class="multiplier-card low">
+                    <h4>ความเสี่ยงต่ำ</h4>
+                    <div class="multiplier-value">1.2x - 1.5x</div>
+                    <div class="multiplier-desc">รางวัลน้อยแต่โอกาสชนะสูง</div>
+                </div>
+                <div class="multiplier-card medium">
+                    <h4>ความเสี่ยงกลาง</h4>
+                    <div class="multiplier-value">1.5x - 3x</div>
+                    <div class="multiplier-desc">ความเสี่ยงและรางวัลสมดุล</div>
+                </div>
+                <div class="multiplier-card high">
+                    <h4>ความเสี่ยงสูง</h4>
+                    <div class="multiplier-value">3x - 10x</div>
+                    <div class="multiplier-desc">รางวัลสูงแต่โอกาสชนะน้อย</div>
+                </div>
+            </div>
+            
+            <h3 class="mt-4">ประวัติการเล่น</h3>
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>เกม</th>
+                        <th>ความเสี่ยง</th>
+                        <th>ตำแหน่งที่เลือก</th>
+                        <th>ตำแหน่งที่ลง</th>
+                        <th>ตัวคูณ</th>
+                        <th>ผลลัพธ์</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTable">
+                    <!-- History rows will be added here -->
+                </tbody>
+            </table>
+            
+            <div class="game-rules">
+                <h3 class="rules-title">กฎการเล่นเกมพลิงโก:</h3>
+                <ul class="rules-list">
+                    <li>เลือกระดับความเสี่ยง (ต่ำ, กลาง, สูง) ซึ่งจะกำหนดตัวคูณที่เป็นไปได้</li>
+                    <li>เลือกตำแหน่งลงจอด (ด้านล่าง) ที่คุณคิดว่าลูกบอลจะลง</li>
+                    <li>วางเดิมพันและปล่อยลูกบอล</li>
+                    <li>ลูกบอลจะกระเด้งลงมาผ่านหมุดและลงในตำแหน่งใดตำแหน่งหนึ่ง</li>
+                    <li>หากลูกบอลลงในตำแหน่งที่คุณเลือก คุณจะชนะเดิมพันคูณด้วยตัวคูณ</li>
+                    <li>หากลูกบอลลงที่อื่น คุณจะเสียเงินเดิมพัน</li>
+                    <li>ระดับความเสี่ยงที่สูงขึ้นมีตัวคูณสูงขึ้นแต่โอกาสชนะน้อยลง</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h4>403classroom เดอะแกมเบลอร์</h4>
+                    <p>ประสบการณ์คาสิโนเสมือนจริงด้วยเงินสมมุติเพื่อความบันเทิงเท่านั้น</p>
+                    <p>ไม่มีเงินจริงเกี่ยวข้องในเกมใดๆ ของเรา</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p>© 2025 403classroom เดอะแกมเบลอร์. สงวนลิขสิทธิ์ทั้งหมด</p>
+                    <p>เว็บไซต์นี้มีวัตถุประสงค์เพื่อการศึกษาเท่านั้น</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elements
+            const userBalanceEl = document.getElementById('userBalance');
+            const pegBoardEl = document.getElementById('pegBoard');
+            const landingZonesEl = document.getElementById('landingZones');
+            const ballEl = document.getElementById('ball');
+            const betAmountEl = document.getElementById('betAmount');
+            const dropBtn = document.getElementById('dropBtn');
+            const gameResultEl = document.getElementById('gameResult');
+            const historyTableEl = document.getElementById('historyTable');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const riskBtns = document.querySelectorAll('.risk-btn');
+            const resetBalanceBtn = document.getElementById('resetBalanceBtn');
+            const alertBox = document.getElementById('alertBox');
+            const alertMessage = document.getElementById('alertMessage');
+            
+            // Game state
+            let selectedRisk = 'low';
+            let selectedPosition = null;
+            let isDropping = false;
+            let gameHistory = [];
+            const NUM_POSITIONS = 10;
+            
+            // Initialize the game
+            function initGame() {
+                createPegs();
+                createLandingZones();
+                
+                // Check if user is logged in
+                fetch('/get_balance')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            userBalanceEl.textContent = data.balance.toLocaleString();
+                        } else {
+                            window.location.href = '/';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        window.location.href = '/';
+                    });
+            }
+            
+            // Create pegs on the board
+            function createPegs() {
+                pegBoardEl.innerHTML = '';
+                
+                // Create a pattern of pegs with offsets for each row
+                for (let row = 0; row < 8; row++) {
+                    const offset = row % 2 === 0 ? 0 : 0.5;
+                    const numPegs = 14 - Math.floor(row / 2);
+                    
+                    for (let col = 0; col < numPegs; col++) {
+                        const peg = document.createElement('div');
+                        peg.className = 'peg';
+                        peg.style.gridRowStart = row + 1;
+                        peg.style.gridColumnStart = Math.round((col + offset) * 1) + 1;
+                        pegBoardEl.appendChild(peg);
+                    }
+                }
+            }
+            
+            // Create landing zones
+            function createLandingZones() {
+                landingZonesEl.innerHTML = '';
+                
+                for (let i = 0; i < NUM_POSITIONS; i++) {
+                    const zone = document.createElement('div');
+                    zone.className = 'zone';
+                    zone.dataset.position = i;
+                    zone.textContent = i + 1;
+                    zone.dataset.value = `ตำแหน่ง ${i + 1}`;
+                    
+                    zone.addEventListener('click', () => {
+                        // Deselect all zones
+                        document.querySelectorAll('.zone').forEach(z => {
+                            z.classList.remove('selected');
+                        });
+                        
+                        // Select this zone
+                        zone.classList.add('selected');
+                        selectedPosition = i;
+                    });
+                    
+                    landingZonesEl.appendChild(zone);
+                }
+            }
+            
+            // Drop the ball
+            function dropBall() {
+                // Validate inputs
+                const bet = parseInt(betAmountEl.value);
+                
+                if (isNaN(bet) || bet <= 0) {
+                    showAlert('กรุณาป้อนจำนวนเงินเดิมพันที่ถูกต้อง', 'danger');
+                    return;
+                }
+                
+                if (selectedPosition === null) {
+                    showAlert('กรุณาเลือกตำแหน่งลงจอด', 'danger');
+                    return;
+                }
+                
+                if (isDropping) {
+                    return;
+                }
+                
+                // Disable controls
+                isDropping = true;
+                dropBtn.disabled = true;
+                betAmountEl.disabled = true;
+                riskBtns.forEach(btn => btn.disabled = true);
+                
+                // Show the ball
+                ballEl.style.display = 'block';
+                
+                // Send drop request
+                fetch('/plinko/play', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        bet: bet,
+                        risk: selectedRisk,
+                        position: selectedPosition
+                    }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Start animation
+                        animateBallDrop(data.final_position, data.multiplier, data.profit, data.new_balance);
+                        
+                        // Add to game history
+                        addToHistory({
+                            gameId: data.game_id,
+                            risk: selectedRisk,
+                            position: selectedPosition,
+                            landed: data.final_position,
+                            multiplier: data.multiplier,
+                            profit: data.profit
+                        });
+                    } else {
+                        showAlert(data.message || 'ไม่สามารถปล่อยลูกบอลได้', 'danger');
+                        resetGame();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('เกิดข้อผิดพลาด โปรดลองอีกครั้ง', 'danger');
+                    resetGame();
+                });
+            }
+            
+            // Show alert function
+            function showAlert(message, type) {
+                alertMessage.textContent = message;
+                alertBox.style.display = 'block';
+                
+                if (type === 'success') {
+                    alertBox.className = 'custom-alert alert-success';
+                } else {
+                    alertBox.className = 'custom-alert alert-danger';
+                }
+                
+                setTimeout(() => {
+                    alertBox.style.display = 'none';
+                }, 3000);
+            }
+            
+            // Animate the ball drop
+            function animateBallDrop(finalPosition, multiplier, profit, newBalance) {
+                // Calculate final horizontal position
+                const zoneWidth = landingZonesEl.offsetWidth / NUM_POSITIONS;
+                const finalLeft = (finalPosition * zoneWidth) + (zoneWidth / 2);
+                
+                // Set final position
+                ballEl.style.left = `${finalLeft}px`;
+                
+                // Add animation class
+                ballEl.classList.add('dropping');
+                
+                // Wait for animation to finish
+                setTimeout(() => {
+                    // Update balance
+                    userBalanceEl.textContent = newBalance.toLocaleString();
+                    userBalanceEl.classList.add('balance-highlight');
+                    
+                    // Highlight the landing zone
+                    const landingZone = document.querySelector(`.zone[data-position="${finalPosition}"]`);
+                    landingZone.classList.add('highlight');
+                    
+                    // Show result
+                    if (finalPosition === selectedPosition) {
+                        showResult(`คุณชนะ! บอลลงที่ตำแหน่ง ${finalPosition + 1} ด้วยตัวคูณ ${multiplier}x กำไร: ${profit.toLocaleString()} บาท!`, 'win');
+                    } else {
+                        showResult(`คุณแพ้! บอลลงที่ตำแหน่ง ${finalPosition + 1} แทนที่จะเป็น ${selectedPosition + 1}`, 'lose');
+                    }
+                    
+                    // Reset after a delay
+                    setTimeout(resetGame, 3000);
+                }, 3000);
+            }
+            
+            // Show game result
+            function showResult(message, type) {
+                gameResultEl.textContent = message;
+                gameResultEl.className = `game-result ${type}`;
+                gameResultEl.style.display = 'block';
+                
+                setTimeout(() => {
+                    if (gameResultEl.classList.contains(type)) {
+                        gameResultEl.style.display = 'none';
+                    }
+                }, 5000);
+            }
+            
+            // Add game to history
+            function addToHistory(game) {
+                // Add to history array
+                gameHistory.unshift(game);
+                
+                // Keep only last 10 games
+                if (gameHistory.length > 10) {
+                    gameHistory.pop();
+                }
+                
+                // Update history table
+                updateHistoryTable();
+            }
+            
+            // Update history table
+            function updateHistoryTable() {
+                historyTableEl.innerHTML = '';
+                
+                gameHistory.forEach((game, index) => {
+                    const row = document.createElement('tr');
+                    
+                    const gameCell = document.createElement('td');
+                    gameCell.textContent = `เกม ${index + 1}`;
+                    row.appendChild(gameCell);
+                    
+                    const riskCell = document.createElement('td');
+                    const riskLabels = {
+                        'low': 'ต่ำ',
+                        'medium': 'กลาง',
+                        'high': 'สูง'
+                    };
+                    riskCell.textContent = riskLabels[game.risk];
+                    if (game.risk === 'low') {
+                        riskCell.style.color = 'var(--success-color)';
+                    } else if (game.risk === 'medium') {
+                        riskCell.style.color = 'var(--warning-color)';
+                    } else {
+                        riskCell.style.color = 'var(--danger-color)';
+                    }
+                    row.appendChild(riskCell);
+                    
+                    const positionCell = document.createElement('td');
+                    positionCell.textContent = game.position + 1;
+                    row.appendChild(positionCell);
+                    
+                    const landedCell = document.createElement('td');
+                    landedCell.textContent = game.landed + 1;
+                    row.appendChild(landedCell);
+                    
+                    const multiplierCell = document.createElement('td');
+                    multiplierCell.textContent = `${game.multiplier}x`;
+                    row.appendChild(multiplierCell);
+                    
+                    const resultCell = document.createElement('td');
+                    if (game.position === game.landed) {
+                        resultCell.innerHTML = `<span style="color: var(--success-color);">+${game.profit.toLocaleString()}</span>`;
+                    } else {
+                        resultCell.innerHTML = `<span style="color: var(--danger-color);">-${game.profit.toLocaleString()}</span>`;
+                    }
+                    row.appendChild(resultCell);
+                    
+                    historyTableEl.appendChild(row);
+                });
+            }
+            
+            // Reset game after play
+            function resetGame() {
+                // Reset UI
+                ballEl.style.display = 'none';
+                ballEl.classList.remove('dropping');
+                document.querySelectorAll('.zone').forEach(z => {
+                    z.classList.remove('highlight');
+                });
+                
+                // Reset controls
+                isDropping = false;
+                dropBtn.disabled = false;
+                betAmountEl.disabled = false;
+                riskBtns.forEach(btn => btn.disabled = false);
+                
+                // Remove balance highlight
+                userBalanceEl.classList.remove('balance-highlight');
+            }
+            
+            // Event listeners
+            dropBtn.addEventListener('click', dropBall);
+            
+            // Risk button listeners
+            riskBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    riskBtns.forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    selectedRisk = btn.dataset.risk;
+                });
+            });
+            
+            // Logout button
+            logoutBtn.addEventListener('click', function() {
+                window.location.href = '/logout';
+            });
+
+            // Reset balance button
+            resetBalanceBtn.addEventListener('click', function() {
+                fetch('/reset_balance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        userBalanceEl.textContent = data.balance.toLocaleString();
+                        userBalanceEl.classList.add('balance-highlight');
+                        setTimeout(() => {
+                            userBalanceEl.classList.remove('balance-highlight');
+                        }, 2000);
+                        
+                        // Show success alert
+                        showAlert(data.message, 'success');
+                    } else {
+                        showAlert(data.message || 'เกิดข้อผิดพลาดในการรีเซ็ตยอดเงิน', 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('เกิดข้อผิดพลาด โปรดลองอีกครั้ง', 'danger');
+                });
+            });
+            
+            // Initialize the game
+            initGame();
+        });
+    </script>
+</body>
+</html> 

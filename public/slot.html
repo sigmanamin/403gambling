@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>403classroom The Gambler - Slot Machine</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #4a148c;
+            --secondary-color: #7b1fa2;
+            --accent-color: #e91e63;
+            --text-color: #f3e5f5;
+            --bg-dark: #1a1a2e;
+            --bg-darker: #16213e;
+            --card-bg: #0f3460;
+            --success-color: #4caf50;
+            --warning-color: #ff9800;
+            --danger-color: #f44336;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        .navbar {
+            background-color: var(--bg-darker);
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        .navbar-brand {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--accent-color) !important;
+        }
+
+        .nav-link {
+            color: var(--text-color) !important;
+        }
+
+        .nav-link:hover {
+            color: var(--accent-color) !important;
+        }
+
+        .balance-display {
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--accent-color);
+            color: gold;
+            font-weight: bold;
+        }
+
+        .game-container {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--secondary-color);
+        }
+
+        .game-title {
+            color: var(--accent-color);
+            text-align: center;
+            margin-bottom: 2rem;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(233, 30, 99, 0.4);
+        }
+
+        .slot-machine {
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 2px solid var(--secondary-color);
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .slot-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 1.5rem;
+        }
+
+        .slot-cell {
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            transition: all 0.3s ease;
+            border: 1px solid var(--secondary-color);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .slot-cell.highlighted {
+            background-color: rgba(76, 175, 80, 0.3);
+            border-color: var(--success-color);
+            animation: pulse 1s infinite;
+            transform: scale(1.05);
+            z-index: 1;
+        }
+
+        .bet-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .bet-amount {
+            width: 150px;
+            text-align: center;
+            padding: 0.5rem;
+            background-color: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--secondary-color);
+            color: var(--text-color);
+            border-radius: 5px;
+        }
+
+        .bet-amount:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .btn-spin {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 0.7rem 2rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .btn-spin:hover:not(:disabled) {
+            background-color: var(--primary-color);
+            transform: scale(1.05);
+        }
+
+        .btn-spin:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+
+        .win-message {
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 1.5rem 0;
+            padding: 1rem;
+            border-radius: 10px;
+            background-color: rgba(76, 175, 80, 0.2);
+            color: var(--success-color);
+            border: 1px solid var(--success-color);
+            display: none;
+        }
+
+        .symbol-info {
+            margin-top: 2rem;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 1.5rem;
+        }
+
+        .symbol-title {
+            color: var(--accent-color);
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+        }
+
+        .symbol-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 1rem;
+        }
+
+        .symbol-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .symbol {
+            font-size: 1.5rem;
+        }
+
+        .multiplier {
+            font-size: 0.9rem;
+            color: var(--text-color);
+            opacity: 0.8;
+        }
+
+        .game-rules {
+            margin-top: 2rem;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 1.5rem;
+        }
+
+        .rules-title {
+            color: var(--accent-color);
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+        }
+
+        .rules-list {
+            padding-left: 1.5rem;
+        }
+
+        .rules-list li {
+            margin-bottom: 0.5rem;
+        }
+
+        footer {
+            background-color: var(--bg-darker);
+            border-top: 2px solid var(--primary-color);
+            padding: 2rem 0;
+            margin-top: 3rem;
+        }
+
+        /* Animation for the balance */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .balance-highlight {
+            animation: pulse 1s infinite;
+        }
+
+        /* Animation for slot spinning */
+        @keyframes spin {
+            0% { transform: translateY(-100px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+
+        .spinning .slot-cell {
+            animation: spin 0.5s ease-out;
+        }
+
+        /* Animation for when cells match */
+        @keyframes match {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        .match {
+            animation: match 0.5s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/casino">403classroom The Gambler</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/casino">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/blackjack">Blackjack</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/slot">Slot Machine</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/crash">Rocket Crash</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dropball">Drop The Ball</a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    <div class="balance-display me-3">
+                        <i class="fa-solid fa-coins me-2"></i>
+                        <span id="userBalance">0</span>
+                    </div>
+                    <button id="logoutBtn" class="btn btn-outline-danger">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="game-container">
+            <h1 class="game-title">Slot Machine</h1>
+            
+            <div class="win-message" id="winMessage"></div>
+            
+            <div class="slot-machine">
+                <div class="slot-grid" id="slotGrid"></div>
+            </div>
+            
+            <div class="bet-controls">
+                <span>Your bet:</span>
+                <input type="number" id="betAmount" class="bet-amount" min="10" step="10" value="50">
+            </div>
+            
+            <div class="controls">
+                <button id="spinBtn" class="btn btn-spin">
+                    <i class="fas fa-sync-alt me-2"></i> SPIN
+                </button>
+            </div>
+            
+            <div class="symbol-info">
+                <h3 class="symbol-title">Symbol Values</h3>
+                <div class="symbol-grid">
+                    <div class="symbol-item">
+                        <div class="symbol">🎰</div>
+                        <div class="multiplier">10x</div>
+                    </div>
+                    <div class="symbol-item">
+                        <div class="symbol">7️⃣</div>
+                        <div class="multiplier">7x</div>
+                    </div>
+                    <div class="symbol-item">
+                        <div class="symbol">💎</div>
+                        <div class="multiplier">5x</div>
+                    </div>
+                    <div class="symbol-item">
+                        <div class="symbol">🍓</div>
+                        <div class="multiplier">3x</div>
+                    </div>
+                    <div class="symbol-item">
+                        <div class="symbol">🍉</div>
+                        <div class="multiplier">3x</div>
+                    </div>
+                    <div class="symbol-item">
+                        <div class="symbol">🍇</div>
+                        <div class="multiplier">2x</div>
+                    </div>
+                    <div class="symbol-item">
+                        <div class="symbol">🍊</div>
+                        <div class="multiplier">2x</div>
+                    </div>
+                    <div class="symbol-item">
+                        <div class="symbol">🍋</div>
+                        <div class="multiplier">2x</div>
+                    </div>
+                    <div class="symbol-item">
+                        <div class="symbol">🍒</div>
+                        <div class="multiplier">2x</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="game-rules">
+                <h3 class="rules-title">Slot Machine Rules:</h3>
+                <ul class="rules-list">
+                    <li>Match at least 4 of the same symbols in a row (horizontally, vertically, or diagonally) to win.</li>
+                    <li>Matching symbols will explode and new symbols will fall into place.</li>
+                    <li>Continue matching until no more matches are possible.</li>
+                    <li>Different symbols have different values. Rarer symbols pay more.</li>
+                    <li>The more symbols you match, the higher the multiplier!</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h4>403classroom The Gambler</h4>
+                    <p>A virtual casino experience with fake currency for entertainment purposes only.</p>
+                    <p>No real money is involved in any of our games.</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p>© 2025 403classroom The Gambler. All rights reserved.</p>
+                    <p>This site is for educational purposes only.</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elements
+            const userBalanceEl = document.getElementById('userBalance');
+            const slotGridEl = document.getElementById('slotGrid');
+            const betAmountEl = document.getElementById('betAmount');
+            const spinBtn = document.getElementById('spinBtn');
+            const winMessageEl = document.getElementById('winMessage');
+            const logoutBtn = document.getElementById('logoutBtn');
+
+            // Initialize slot grid
+            function initSlotGrid() {
+                slotGridEl.innerHTML = '';
+                
+                for (let i = 0; i < 25; i++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'slot-cell';
+                    cell.dataset.row = Math.floor(i / 5);
+                    cell.dataset.col = i % 5;
+                    cell.textContent = getRandomSymbol();
+                    slotGridEl.appendChild(cell);
+                }
+            }
+
+            // Get random symbol
+            function getRandomSymbol() {
+                const symbols = ['🍒', '🍊', '🍋', '🍇', '🍉', '🍓', '💎', '7️⃣', '🎰'];
+                const weights = [20, 20, 20, 15, 15, 10, 5, 3, 2]; // Probability weights
+                
+                // Weighted random selection
+                const totalWeight = weights.reduce((a, b) => a + b, 0);
+                let random = Math.random() * totalWeight;
+                
+                for (let i = 0; i < weights.length; i++) {
+                    random -= weights[i];
+                    if (random <= 0) {
+                        return symbols[i];
+                    }
+                }
+                
+                return symbols[0]; // Fallback
+            }
+
+            // Check if user is logged in
+            fetch('/get_balance')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        userBalanceEl.textContent = data.balance.toLocaleString();
+                        initSlotGrid();
+                    } else {
+                        window.location.href = '/';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    window.location.href = '/';
+                });
+
+            // Spin the slot machine
+            function spin() {
+                const bet = parseInt(betAmountEl.value);
+                
+                if (isNaN(bet) || bet <= 0) {
+                    alert('Please enter a valid bet amount');
+                    return;
+                }
+                
+                // Disable controls
+                spinBtn.disabled = true;
+                betAmountEl.disabled = true;
+                winMessageEl.style.display = 'none';
+                
+                // Reset all cell highlights
+                const cells = document.querySelectorAll('.slot-cell');
+                cells.forEach(cell => {
+                    cell.classList.remove('highlighted');
+                });
+                
+                // Add spinning animation class
+                slotGridEl.classList.add('spinning');
+                
+                // Send spin request
+                fetch('/slot/spin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ bet }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Delay to show spinning animation
+                        setTimeout(() => {
+                            // Update balance
+                            userBalanceEl.textContent = data.balance.toLocaleString();
+                            
+                            // Update slot grid with new symbols
+                            updateSlotGrid(data.grid, data.matches);
+                            
+                            // Show win message if any
+                            if (data.win_amount > 0) {
+                                winMessageEl.textContent = `You won ${data.win_amount.toLocaleString()} coins! 🎉`;
+                                winMessageEl.style.display = 'block';
+                                
+                                // Highlight balance change
+                                userBalanceEl.classList.add('balance-highlight');
+                                setTimeout(() => {
+                                    userBalanceEl.classList.remove('balance-highlight');
+                                }, 2000);
+                            }
+                            
+                            // Re-enable controls
+                            spinBtn.disabled = false;
+                            betAmountEl.disabled = false;
+                            
+                            // Remove spinning class
+                            slotGridEl.classList.remove('spinning');
+                        }, 500); // Delay for animation
+                    } else {
+                        alert(data.message || 'Failed to spin');
+                        spinBtn.disabled = false;
+                        betAmountEl.disabled = false;
+                        slotGridEl.classList.remove('spinning');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred. Please try again.');
+                    spinBtn.disabled = false;
+                    betAmountEl.disabled = false;
+                    slotGridEl.classList.remove('spinning');
+                });
+            }
+
+            // Update the slot grid with new symbols
+            function updateSlotGrid(grid, matches) {
+                // Map of matched positions
+                const matchedPositions = {};
+                
+                if (matches && matches.length) {
+                    matches.forEach(match => {
+                        matchedPositions[`${match.row}-${match.col}`] = true;
+                    });
+                }
+                
+                // Update each cell
+                const cells = document.querySelectorAll('.slot-cell');
+                cells.forEach(cell => {
+                    const row = parseInt(cell.dataset.row);
+                    const col = parseInt(cell.dataset.col);
+                    
+                    // Update symbol
+                    cell.textContent = grid[row][col];
+                    
+                    // Highlight matched cells
+                    if (matchedPositions[`${row}-${col}`]) {
+                        cell.classList.add('highlighted');
+                    }
+                });
+            }
+
+            // Event listeners
+            spinBtn.addEventListener('click', spin);
+
+            // Logout button
+            logoutBtn.addEventListener('click', function() {
+                window.location.href = '/logout';
+            });
+        });
+    </script>
+</body>
+</html> 
