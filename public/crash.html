@@ -481,11 +481,11 @@
                 <div class="sky"></div>
                 <div class="stars" id="stars"></div>
                 <div class="rocket" id="rocket">
-                    <img src="https://i.imgur.com/Zyzy0DL.png" alt="Rocket">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48IS0tISBGb250IEF3ZXNvbWUgUHJvIDYuNC4wIGJ5IEBmb250YXdlc29tZSAtIGh0dHBzOi8vZm9udGF3ZXNvbWUuY29tIExpY2Vuc2UgLSBodHRwczovL2ZvbnRhd2Vzb21lLmNvbS9saWNlbnNlIChDb21tZXJjaWFsIExpY2Vuc2UpIENvcHlyaWdodCAyMDIzIEZvbnRpY29ucywgSW5jLiAtLT48cGF0aCBmaWxsPSIjZTkxZTYzIiBkPSJNMTU2LjYgMzg0LjlMMTI1LjcgMzUzLjljLTIuOS0yLjktNi45LTQuNS0xMS0zLjljLTI1LjggMy44LTUxLjQgLTQuOC02OC44LTIyLjJzLTI2LTQzLTIyLjItNjguOGMuNi00LjEtMS0xLjktMy45LTExTDMuOCAyMTcuMWMtNy44LTcuOC03LjgtMjAuNSAwLTI4LjNMNDEuMyAxNTAuM2M4LjctOC43IDEyLjktMjEuMSAxMS4yLTMzLjNYLTE1LjQtMTExLjcgOTYuNC0yMjMuNSAyMDguMS0yMDguMWMxMi4yIDEuNyAyNC43IC0yLjUgMzMuMy0xMS4yTDMzMy43IDMuOGM3LjgtNy44IDIwLjUtNy44IDI4LjMgMEwzOTMgMzUuN2M0LjEgMi45IDcuMiA2LjEgMTEgMy45YzI1LjgtMy44IDUxLjQgNC44IDY4LjggMjIuMnMyNiA0MyAyMi4yIDY4LjhjLS42IDQuMSAuOSA4LjEgMy45IDExbDMxIDMxYzcuOCA3LjggNy44IDIwLjUgMCAyOC4zTDQ3MC43IDI0My43Yy04LjcgOC43LTEyLjkgMjEuMS0xMS4yIDMzLjNjMTUuNCAxMTEuNy05Ni40IDIyMy41LTIwOC4xIDIwOC4xYy0xMi4yLTEuNy0yNC43IDIuNS0zMy4zIDExLjJMMTg1IDMzOC4zYy03LjggNy44LTIwLjUgNy44LTI4LjMgMHpNMjU2IDE2MGEzMiAzMiAwIDEgMSAwLTY0IDMyIDMyIDAgMSAxIDAgNjR6bTAtMTI4Yy01My4zIDAtOTYuNyA0My40LTk2LjcgOTYuN3M0My40IDk2LjcgOTYuNyA5Ni43czk2LjctNDMuNCA5Ni43LTk2LjdzLTQzLjQtOTYuNy05Ni43LTk2Ljd6Ii8+PC9zdmc+" alt="Rocket">
                 </div>
                 <div class="multiplier-display" id="multiplierDisplay">1.00x</div>
-                <div class="crash" id="crashText">CRASH!</div>
-                <div class="game-status" id="gameStatus">Waiting for players...</div>
+                <div class="crash" id="crashText">ระเบิด!</div>
+                <div class="game-status" id="gameStatus">กำลังรอผู้เล่น...</div>
             </div>
             
             <div class="bet-controls">
@@ -579,6 +579,16 @@
             let autoCashoutValue = 2.0;
             let history = [];
             let username = '';
+            let currentUsername = '';
+            
+            // Status text translations
+            const statusTexts = {
+                waiting: "กำลังรอผู้เล่น...",
+                active: "เกมกำลังเล่น",
+                crashed: "เกมจบแล้ว!",
+                player_waiting: "กำลังรอคิว",
+                player_active: "กำลังเล่น"
+            };
 
             // Create stars for the background
             function createStars() {
@@ -679,112 +689,190 @@
                 });
             }
 
-            // Check game status periodically
+            // Check game status regularly
             function startStatusCheck() {
-                statusCheckInterval = setInterval(() => {
-                    fetch('/crash/status')
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                // Update game state
-                                isActive = data.is_active;
-                                isWaiting = data.is_waiting;
-                                currentMultiplier = data.current_multiplier;
-                                
-                                // Update UI
-                                updateRocket();
-                                updateGameStatus(data.game_status);
-                                updatePlayerList(data.players_online, data.active_players, data.waiting_players);
-                                updatePlayerStatus();
-                                
-                                // Update balance
-                                userBalanceEl.textContent = data.balance.toLocaleString();
-                                
-                                // Enable cashout if active
-                                cashoutBtn.disabled = !isActive;
-                                
-                                // Update history if changed
-                                if (data.game_history && (!history.length || data.game_history[0] !== history[0])) {
-                                    updateHistoryMultipliers(data.game_history);
-                                }
-                                
-                                // Check for game crash
-                                if (data.game_status === 'crashed' && data.crash_point) {
-                                    showCrash(data.crash_point);
-                                    
-                                    // If we were active and now game crashed, show result
-                                    if (isActive) {
-                                        showResult('You lost!', 'lose');
-                                        isActive = false;
-                                        resetControls();
-                                    }
-                                }
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error checking game status:', error);
-                        });
-                }, 500);
-            }
-
-            // Update rocket position based on multiplier
-            function updateRocket() {
-                const height = Math.min((currentMultiplier - 1) * 100, 220);
-                rocketEl.style.bottom = `${height}px`;
-                multiplierDisplayEl.textContent = `${currentMultiplier.toFixed(2)}x`;
-            }
-
-            // Update game status display
-            function updateGameStatus(status) {
-                gameStatusEl.textContent = status === 'waiting' ? 'Waiting for players...' :
-                                          status === 'active' ? 'Game in progress!' : 
-                                          'Crashed!';
-                                          
-                gameStatusEl.className = 'game-status ' + status;
-            }
-
-            // Update player status display
-            function updatePlayerStatus() {
-                if (isActive) {
-                    playerStatusEl.textContent = 'Playing';
-                    playerStatusEl.className = 'badge badge-active';
-                } else if (isWaiting) {
-                    playerStatusEl.textContent = 'Waiting';
-                    playerStatusEl.className = 'badge badge-waiting';
-                } else {
-                    playerStatusEl.textContent = '';
-                    playerStatusEl.className = 'badge';
-                }
-            }
-
-            // Update player list
-            function updatePlayerList(playersOnline, activePlayers, waitingPlayers) {
-                playersListEl.innerHTML = '';
-                onlineCountEl.textContent = playersOnline.length;
+                // Initial status check
+                checkGameStatus();
                 
-                // Get current username
-                fetch('/get_balance')
+                // Set interval for regular status checks
+                statusCheckInterval = setInterval(checkGameStatus, 500);
+            }
+
+            function checkGameStatus() {
+                fetch('/crash/status')
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            username = data.username || '';
+                            // Update player status
+                            isActive = data.is_active;
+                            isWaiting = data.is_waiting;
                             
-                            // Create player tags
-                            playersOnline.forEach(player => {
-                                const playerTag = document.createElement('div');
+                            // Store username
+                            if (data.username && !currentUsername) {
+                                currentUsername = data.username;
+                            }
+                            
+                            // Update game status
+                            const status = data.game_status;
+                            if (status === 'active') {
+                                // Game is active
+                                gameStatusEl.textContent = statusTexts.active;
+                                gameStatusEl.className = 'game-status active';
                                 
-                                let className = 'player-tag';
-                                if (player === username) className += ' you';
-                                if (activePlayers.includes(player)) className += ' active';
-                                else if (waitingPlayers.includes(player)) className += ' waiting';
+                                // Update multiplier
+                                currentMultiplier = data.current_multiplier;
+                                multiplierDisplayEl.textContent = `${currentMultiplier.toFixed(2)}x`;
                                 
-                                playerTag.className = className;
-                                playerTag.textContent = player;
+                                // Move rocket based on multiplier (higher = higher on screen)
+                                const height = Math.min(250, (currentMultiplier - 1) * 100);
+                                rocketEl.style.bottom = `${height}px`;
                                 
-                                playersListEl.appendChild(playerTag);
-                            });
+                                // Enable cashout button if player is active
+                                if (isActive) {
+                                    cashoutBtn.disabled = false;
+                                    playerStatusEl.textContent = statusTexts.player_active;
+                                    playerStatusEl.className = 'badge badge-active';
+                                } else {
+                                    cashoutBtn.disabled = true;
+                                    
+                                    // Show waiting badge if player is waiting
+                                    if (isWaiting) {
+                                        playerStatusEl.textContent = statusTexts.player_waiting;
+                                        playerStatusEl.className = 'badge badge-waiting';
+                                        betBtn.disabled = true;
+                                    } else {
+                                        playerStatusEl.textContent = '';
+                                        betBtn.disabled = false;
+                                        betAmountEl.disabled = false;
+                                        autoCashoutEl.disabled = false;
+                                    }
+                                }
+                                
+                                // Hide crash text
+                                crashTextEl.style.display = 'none';
+                            } else if (status === 'crashed') {
+                                // Game crashed
+                                gameStatusEl.textContent = statusTexts.crashed;
+                                gameStatusEl.className = 'game-status crashed';
+                                
+                                // Show crash text
+                                crashTextEl.style.display = 'block';
+                                crashTextEl.style.top = rocketEl.style.bottom;
+                                crashTextEl.style.left = '50%';
+                                
+                                // Create explosion effect
+                                const explosion = document.createElement('div');
+                                explosion.className = 'explosion';
+                                explosion.style.top = rocketEl.style.bottom;
+                                explosion.style.left = '50%';
+                                rocketEl.parentNode.appendChild(explosion);
+                                
+                                // Hide rocket and reset after animation
+                                rocketEl.style.display = 'none';
+                                setTimeout(() => {
+                                    explosion.remove();
+                                    rocketEl.style.display = 'block';
+                                    rocketEl.style.bottom = '0px';
+                                    crashTextEl.style.display = 'none';
+                                }, 1000);
+                                
+                                // Disable cashout and show player status
+                                cashoutBtn.disabled = true;
+                                playerStatusEl.textContent = '';
+                                
+                                // Update game history if available
+                                if (data.crash_point) {
+                                    updateGameHistory(data.crash_point);
+                                }
+                                
+                                // Reset controls for next game if not waiting
+                                if (!isWaiting) {
+                                    betBtn.disabled = false;
+                                    betAmountEl.disabled = false;
+                                    autoCashoutEl.disabled = false;
+                                }
+                            } else {
+                                // Game waiting to start
+                                gameStatusEl.textContent = statusTexts.waiting;
+                                gameStatusEl.className = 'game-status waiting';
+                                
+                                // Show waiting badge if player is waiting
+                                if (isWaiting) {
+                                    playerStatusEl.textContent = statusTexts.player_waiting;
+                                    playerStatusEl.className = 'badge badge-waiting';
+                                    betBtn.disabled = true;
+                                    betAmountEl.disabled = true;
+                                    autoCashoutEl.disabled = true;
+                                } else {
+                                    playerStatusEl.textContent = '';
+                                    betBtn.disabled = false;
+                                    betAmountEl.disabled = false;
+                                    autoCashoutEl.disabled = false;
+                                }
+                                
+                                // Hide crash text and reset multiplier
+                                crashTextEl.style.display = 'none';
+                                multiplierDisplayEl.textContent = '1.00x';
+                                rocketEl.style.bottom = '0px';
+                            }
+                            
+                            // Update balance
+                            userBalanceEl.textContent = data.balance.toLocaleString();
+                            
+                            // Update player list
+                            updatePlayersList(data.players_online, data.active_players, data.waiting_players);
+                            
+                            // Update game history
+                            if (data.game_history && data.game_history.length > 0) {
+                                updateGameHistoryDisplay(data.game_history);
+                            }
                         }
+                    })
+                    .catch(error => {
+                        console.error('Error checking game status:', error);
                     });
+            }
+
+            // Update player list with online, active, and waiting players
+            function updatePlayersList(playersOnline, activePlayers, waitingPlayers) {
+                // Clear current list
+                playersListEl.innerHTML = '';
+                
+                // Update online count
+                onlineCountEl.textContent = playersOnline ? playersOnline.length : 0;
+                
+                // No players, show message
+                if (!playersOnline || playersOnline.length === 0) {
+                    const noPlayersMsg = document.createElement('div');
+                    noPlayersMsg.textContent = 'ไม่มีผู้เล่นออนไลน์';
+                    noPlayersMsg.style.opacity = '0.7';
+                    playersListEl.appendChild(noPlayersMsg);
+                    return;
+                }
+                
+                // Add each player to the list
+                playersOnline.forEach(player => {
+                    const playerTag = document.createElement('div');
+                    playerTag.textContent = player;
+                    
+                    // Add class based on player status
+                    if (activePlayers && activePlayers.includes(player)) {
+                        playerTag.className = 'player-tag active';
+                        playerTag.textContent += ' (กำลังเล่น)';
+                    } else if (waitingPlayers && waitingPlayers.includes(player)) {
+                        playerTag.className = 'player-tag waiting';
+                        playerTag.textContent += ' (กำลังรอ)';
+                    } else {
+                        playerTag.className = 'player-tag';
+                    }
+                    
+                    // Highlight current player
+                    if (player === currentUsername) {
+                        playerTag.style.fontWeight = 'bold';
+                    }
+                    
+                    playersListEl.appendChild(playerTag);
+                });
             }
 
             // Update history multipliers display
